@@ -119,43 +119,66 @@ resource "google_compute_network_peering" "producer_to_consumer_peering" {
   name         = "producer-consumer"
   network      = module.producer_vpc.self_link
   peer_network = module.consumer_vpc.self_link
-
-  export_custom_routes = var.export_custom_routes_a_to_b
-  import_custom_routes = var.import_custom_routes_a_to_b
+  export_custom_routes = false
+  import_custom_routes = true
 }
 
 resource "google_compute_network_peering" "consumer_to_producer_peering" {
   name         = "consumer-producer"
   network      = module.consumer_vpc.self_link
   peer_network = module.producer_vpc.self_link
+  export_custom_routes = false
+  import_custom_routes = true
 
-  export_custom_routes = var.export_custom_routes_b_to_a
-  import_custom_routes = var.import_custom_routes_b_to_a
-
-  # Ensure the first side is created first to avoid race conditions
   depends_on = [google_compute_network_peering.producer_to_consumer_peering]
 }
 
 # -----------------------------------------------------------------------------------------
-# Instance template & MIG Configuration
+# Instance template
 # -----------------------------------------------------------------------------------------
 module "instance_template" {
+  source = "../modules/instance-template"
+
+  project_id  = var.project_id
+  region      = var.region
+  name_prefix = "app-web"
+
+  machine_type      = "e2-standard-4"
+  source_image      = "projects/debian-cloud/global/images/family/debian-12"
+  boot_disk_size_gb = 50
+  boot_disk_type    = "pd-balanced"
+
+  subnetwork       = "projects/${var.project_id}/regions/${var.region}/subnetworks/app-subnet"
+  assign_public_ip = false
+  network_tags     = ["app-web", "http-server"]
+
+  create_service_account = true
+  service_account_roles = [
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+  ]
+
+  startup_script = <<-EOT
+    #!/usr/bin/env bash
+    set -euo pipefail
+    apt-get update
+    apt-get install -y nginx
+    systemctl enable nginx --now
+  EOT
+
+  labels = {
+    environment = "production"
+    team        = "platform"
+  }
+}
+
+# -----------------------------------------------------------------------------------------
+# MIG Configuration
+# -----------------------------------------------------------------------------------------
+module "mig" {
   source        = "./modules/mig"
-  auto_delete   = var.ubuntu_auto_delete
-  boot          = var.ubuntu_boot
-  source_image  = var.ubuntu_source_os_image
-  template_name = var.frontend_template_name
-  machine_type  = var.ubuntu_machine_type
-  network       = module.producer_vpc.vpc_id
-  subnetwork    = module.carshub_private_subnets.subnets[0].id
-  startup_script = templatefile("${path.module}/../../scripts/user_data_frontend.sh", {
-    BASE_URL = "http://${module.backend_lb.address}"
-    CDN_URL  = module.carshub_cdn.cdn_ip_address
-  })
-  port_specification     = var.port_specification
-  request_path           = "/"
-  health_check_name      = var.frontend_health_check
-  location               = var.location
+  location               = var.producer_region
+  template_name = ""  
   mig_base_instance_name = var.base_instance_name
   instance_template_name = var.frontend_template_name
   mig_named_port_name    = var.frontend_named_port_name
@@ -204,7 +227,6 @@ resource "google_dns_managed_zone" "private_zone" {
   dns_name    = var.dns_name
   description = "Private DNS zone managed by Terraform"
   visibility  = "private"
-
   private_visibility_config {
     dynamic "networks" {
       for_each = var.vpc_network_self_links
@@ -221,7 +243,7 @@ resource "google_dns_record_set" "record" {
   type         = "A"
   ttl          = var.ttl
   managed_zone = google_dns_managed_zone.private_zone.name
-
+  
   rrdatas = [module.lb.address]
 }
 
