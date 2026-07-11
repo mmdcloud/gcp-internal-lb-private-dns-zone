@@ -113,20 +113,42 @@ module "consumer_vpc" {
 }
 
 # --------------------------------------------------------------------------
+# NAT Gateway and Cloud Router Configuration  
+# --------------------------------------------------------------------------
+resource "google_compute_router" "router" {
+  name    = "router"
+  region  = var.producer_region
+  network = module.producer_vpc.self_link
+}
+
+resource "google_compute_router_nat" "router_nat" {
+  name                               = "router-nat"
+  router                             = google_compute_router.router.name
+  region                             = google_compute_router.router.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+  type                               = "PUBLIC"
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# --------------------------------------------------------------------------
 # VPC Network Peering
 # --------------------------------------------------------------------------
 resource "google_compute_network_peering" "producer_to_consumer_peering" {
-  name         = "producer-consumer"
-  network      = module.producer_vpc.self_link
-  peer_network = module.consumer_vpc.self_link
+  name                 = "producer-consumer"
+  network              = module.producer_vpc.self_link
+  peer_network         = module.consumer_vpc.self_link
   export_custom_routes = false
   import_custom_routes = true
 }
 
 resource "google_compute_network_peering" "consumer_to_producer_peering" {
-  name         = "consumer-producer"
-  network      = module.consumer_vpc.self_link
-  peer_network = module.producer_vpc.self_link
+  name                 = "consumer-producer"
+  network              = module.consumer_vpc.self_link
+  peer_network         = module.producer_vpc.self_link
   export_custom_routes = false
   import_custom_routes = true
 
@@ -137,18 +159,18 @@ resource "google_compute_network_peering" "consumer_to_producer_peering" {
 # Instance template
 # -----------------------------------------------------------------------------------------
 module "instance_template" {
-  source = "../modules/instance-template"
+  source = "./modules/instance-template"
 
-  project_id  = var.project_id
-  region      = var.region
-  name_prefix = "app-web"
+  region     = var.producer_region
+  project_id = data.google_project.project.project_id
 
+  name_prefix       = "app-web"
   machine_type      = "e2-standard-4"
   source_image      = "projects/debian-cloud/global/images/family/debian-12"
   boot_disk_size_gb = 50
   boot_disk_type    = "pd-balanced"
 
-  subnetwork       = "projects/${var.project_id}/regions/${var.region}/subnetworks/app-subnet"
+  subnetwork       = module.producer_vpc.subnets[0].self_link
   assign_public_ip = false
   network_tags     = ["app-web", "http-server"]
 
@@ -159,11 +181,11 @@ module "instance_template" {
   ]
 
   startup_script = <<-EOT
-    #!/usr/bin/env bash
+    #!/bin/bash
     set -euo pipefail
-    apt-get update
-    apt-get install -y nginx
-    systemctl enable nginx --now
+    sudo apt-get update
+    sudo apt-get install -y nginx
+    echo "Hello World from $(hostname -f)" > /var/www/html/index.html
   EOT
 
   labels = {
@@ -176,15 +198,32 @@ module "instance_template" {
 # MIG Configuration
 # -----------------------------------------------------------------------------------------
 module "mig" {
-  source        = "./modules/mig"
-  location               = var.producer_region
-  template_name = ""  
-  mig_base_instance_name = var.base_instance_name
-  instance_template_name = var.frontend_template_name
-  mig_named_port_name    = var.frontend_named_port_name
-  mig_named_port_port    = var.named_port_frontend
-  mig_name               = var.frontend_mig_name
-  mig_target_size        = var.target_size
+  source = "./modules/mig"
+
+  project_id = var.project_id
+  name       = "web"
+  region     = var.producer_region
+  
+  instance_template = module.instance_template.self_link_unique
+  
+  named_ports = [
+    { name = "http", port = 80 }
+  ]
+
+  health_check = {
+    type         = "HTTP"
+    port         = 80
+    request_path = "/"
+  }
+
+  autoscaling = {
+    min_replicas = 2
+    max_replicas = 6
+  }
+
+  labels = {
+    env = "dev"
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -243,7 +282,7 @@ resource "google_dns_record_set" "record" {
   type         = "A"
   ttl          = var.ttl
   managed_zone = google_dns_managed_zone.private_zone.name
-  
+
   rrdatas = [module.lb.address]
 }
 

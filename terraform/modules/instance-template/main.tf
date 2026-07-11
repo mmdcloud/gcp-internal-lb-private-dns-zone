@@ -1,9 +1,3 @@
-############################################
-# Random suffix -- enables create_before_destroy
-# so this template can be swapped without name
-# collisions during MIG rolling updates.
-############################################
-
 resource "random_id" "suffix" {
   byte_length = 4
 
@@ -14,10 +8,6 @@ resource "random_id" "suffix" {
     source_image = var.source_image
   }
 }
-
-############################################
-# Dedicated service account (least privilege)
-############################################
 
 resource "google_service_account" "this" {
   count = var.service_account_email == null && var.create_service_account ? 1 : 0
@@ -52,15 +42,11 @@ locals {
   )
 }
 
-############################################
-# Instance template
-############################################
-
 resource "google_compute_instance_template" "this" {
   project     = var.project_id
   name        = "${var.name_prefix}-${random_id.suffix.hex}"
   description = var.description
-
+  
   machine_type     = var.machine_type
   min_cpu_platform = var.min_cpu_platform
   region           = var.region
@@ -108,7 +94,7 @@ resource "google_compute_instance_template" "this" {
       }
     }
   }
-
+  
   metadata = local.base_metadata
 
   service_account {
