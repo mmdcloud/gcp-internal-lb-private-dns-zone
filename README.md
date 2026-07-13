@@ -1,5 +1,8 @@
 # GCP Producer/Consumer VPC Peering Platform
 
+[![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?style=for-the-badge&logo=terraform&logoColor=white)](https://www.terraform.io/)
+[![Google Cloud](https://img.shields.io/badge/GoogleCloud-%234285F4.svg?style=for-the-badge&logo=google-cloud&logoColor=white)](https://cloud.google.com/)
+
 Terraform configuration that provisions a two-VPC ("producer" and "consumer")
 network topology on Google Cloud, peered together, with a NAT-enabled
 producer network hosting an autoscaled, load-balanced NGINX service and a
