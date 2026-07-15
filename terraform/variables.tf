@@ -1,6 +1,7 @@
 variable "project_id" {
   description = "GCP project ID"
   type        = string
+  default     = null
 }
 
 variable "producer_region" {
@@ -19,6 +20,12 @@ variable "dns_zone_name" {
   description = "Terraform resource / Cloud DNS zone name (must be unique per project)"
   type        = string
   default     = "internal-private-zone"
+}
+
+variable "domain" {
+  description = "Domain Name"
+  type        = string
+  default     = null
 }
 
 variable "dns_name" {

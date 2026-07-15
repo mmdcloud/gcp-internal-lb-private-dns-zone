@@ -31,8 +31,6 @@ locals {
     try(google_service_account.this[0].email, null)
   )
 
-  # Merge user metadata with computed keys; user values win on collision except
-  # for keys we explicitly manage below.
   base_metadata = merge(
     var.metadata,
     var.startup_script != null ? { startup-script = var.startup_script } : {},

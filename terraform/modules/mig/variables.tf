@@ -66,13 +66,13 @@ variable "named_ports" {
 variable "update_policy" {
   description = "Rolling update policy for the MIG."
   type = object({
-    type                    = optional(string, "PROACTIVE") # PROACTIVE or OPPORTUNISTIC
-    minimal_action          = optional(string, "REPLACE")   # REPLACE or RESTART
-    max_surge_fixed         = optional(number, null)
-    max_surge_percent       = optional(number, 20)
-    max_unavailable_fixed   = optional(number, null)
-    max_unavailable_percent = optional(number, 0)
-    replacement_method      = optional(string, "SUBSTITUTE") # SUBSTITUTE or RECREATE
+    type                     = optional(string, "PROACTIVE") # PROACTIVE or OPPORTUNISTIC
+    minimal_action           = optional(string, "REPLACE")   # REPLACE or RESTART
+    max_surge_fixed          = optional(number, 3)
+    max_surge_percent        = optional(number, null)
+    max_unavailable_fixed    = optional(number, 0)
+    max_unavailable_percent  = optional(number, null)
+    replacement_method       = optional(string, "SUBSTITUTE") # SUBSTITUTE or RECREATE
   })
   default = {}
 }

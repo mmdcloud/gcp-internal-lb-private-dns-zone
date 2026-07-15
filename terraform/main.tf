@@ -164,15 +164,16 @@ module "instance_template" {
   region     = var.producer_region
   project_id = data.google_project.project.project_id
 
-  name_prefix       = "app-web"
-  machine_type      = "e2-standard-4"
-  source_image      = "projects/debian-cloud/global/images/family/debian-12"
+  name_prefix       = "producer-instance-template"
+  machine_type      = "e2-medium"
+  source_image      = "ubuntu-minimal-2604-resolute-amd64-v20260704"
   boot_disk_size_gb = 50
   boot_disk_type    = "pd-balanced"
 
+  network          = module.producer_vpc.self_link
   subnetwork       = module.producer_vpc.subnets[0].self_link
   assign_public_ip = false
-  network_tags     = ["app-web", "http-server"]
+  network_tags     = ["producer-instance"]
 
   create_service_account = true
   service_account_roles = [
@@ -201,11 +202,11 @@ module "mig" {
   source = "./modules/mig"
 
   project_id = var.project_id
-  name       = "web"
+  name       = "mig"
   region     = var.producer_region
-  
+
   instance_template = module.instance_template.self_link_unique
-  
+
   named_ports = [
     { name = "http", port = 80 }
   ]
@@ -217,8 +218,8 @@ module "mig" {
   }
 
   autoscaling = {
-    min_replicas = 2
-    max_replicas = 6
+    min_replicas = 1
+    max_replicas = 5
   }
 
   labels = {
@@ -230,31 +231,25 @@ module "mig" {
 # Load Balancer
 # -----------------------------------------------------------------------------------------
 module "lb" {
-  source                                  = "./modules/load-balancer"
-  forwarding_port_range                   = "80"
-  forwarding_rule_name                    = "frontend-global-forwarding-rule"
-  forwarding_scheme                       = "EXTERNAL"
-  global_address_type                     = "EXTERNAL"
-  url_map_name                            = "frontend-url-map"
-  global_address_name                     = "frontend-lb-global-address"
-  target_proxy_name                       = "frontend-target-proxy"
-  backend_service_name                    = "frontend-service"
-  backend_service_enable_cdn              = false
-  backend_service_port_name               = "frontend-port"
-  backend_service_protocol                = "HTTP"
-  backend_service_timeout_sec             = 10
-  backend_service_load_balancing_scheme   = "EXTERNAL"
-  backend_service_custom_request_headers  = ["X-Client-Geo-Location: {client_region_subdivision}, {client_city}"]
-  backend_service_custom_response_headers = ["X-Cache-Hit: {cdn_cache_status}"]
-  backend_service_health_checks           = [module.carshub_frontend_instance.health_check_id]
-  # security_policy                         = module.cloud_armor.policy.id
-  backend_service_backends = [
-    {
-      group           = "${module.carshub_frontend_instance.instance_group}"
-      balancing_mode  = "UTILIZATION"
-      capacity_scaler = 1.0
+  source = "./modules/load-balancer"
+
+  project_id = var.project_id
+  name       = "lb"
+  backends = {
+    lb = {
+      is_default          = true
+      protocol            = "HTTP"
+      port_name           = "http"
+      health_check_id     = module.mig.health_check_id
+      manage_health_check = false
+      groups = [
+        { group = module.mig.instance_group_self_link }
+      ]
     }
-  ]
+  }
+
+  enable_cloud_armor   = false
+  enable_http_redirect = false
 }
 
 # --------------------------------------------------------------------------
@@ -263,16 +258,22 @@ module "lb" {
 resource "google_dns_managed_zone" "private_zone" {
   project     = var.project_id
   name        = var.dns_zone_name
-  dns_name    = var.dns_name
+  dns_name    = "${var.dns_name}."
   description = "Private DNS zone managed by Terraform"
   visibility  = "private"
   private_visibility_config {
-    dynamic "networks" {
-      for_each = var.vpc_network_self_links
-      content {
-        network_url = networks.value
-      }
+    networks {
+      network_url = module.consumer_vpc.self_link
     }
+    networks {
+      network_url = module.producer_vpc.self_link
+    }
+    # dynamic "networks" {
+    #   for_each = var.vpc_network_self_links
+    #   content {
+    #     network_url = networks.value
+    #   }
+    # }
   }
 }
 
@@ -283,7 +284,7 @@ resource "google_dns_record_set" "record" {
   ttl          = var.ttl
   managed_zone = google_dns_managed_zone.private_zone.name
 
-  rrdatas = [module.lb.address]
+  rrdatas = [module.lb.lb_ip_address]
 }
 
 # --------------------------------------------------------------------------
@@ -291,28 +292,25 @@ resource "google_dns_record_set" "record" {
 # --------------------------------------------------------------------------
 
 # Consumer Instance
-resource "google_compute_address" "consumer_instance_address" {
-  name = "consumer-instance-address"
-}
+# resource "google_compute_address" "consumer_instance_address" {
+#   name = "consumer-instance-address"
+#   region = var.consumer_region
+# }
 
 module "consumer_instance" {
   source                    = "./modules/compute"
   name                      = "consumer-instance"
   machine_type              = "e2-micro"
-  zone                      = var.consumer_region
+  zone                      = "${var.consumer_region}-a"
   metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
   deletion_protection       = false
   allow_stopping_for_update = true
   image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
   network_interfaces = [
     {
-      network    = "${module.consumer_vpc.vpc_id}"
-      subnetwork = "${module.consumer_vpc.subnets[0].id}"
-      access_configs = [
-        {
-          nat_ip = "${google_compute_address.consumer_instance_address.address}"
-        }
-      ]
+      network        = "${module.consumer_vpc.vpc_id}"
+      subnetwork     = "${module.consumer_vpc.subnets[0].id}"
+      access_configs = []
     }
   ]
   tags = ["consumer-instance"]

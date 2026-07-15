@@ -53,11 +53,11 @@ resource "google_compute_health_check" "this" {
 }
 
 resource "google_compute_region_instance_group_manager" "this" {
-  project = var.project_id
-  name    = "${var.name}-mig"
+  project     = var.project_id
+  name        = "${var.name}-mig"
   description = var.description
-  region  = var.region 
-  
+  region      = var.region
+
   base_instance_name = var.name
   target_size        = var.target_size
 
@@ -127,7 +127,7 @@ resource "google_compute_region_autoscaler" "this" {
     }
 
     dynamic "scale_in_control" {
-      for_each = var.autoscaling.scale_in_control != null ? [1] : []
+      for_each = var.autoscaling.scale_in_control != null ? [var.autoscaling.scale_in_control] : []
       content {
         max_scaled_in_replicas {
           fixed   = scale_in_control.value.max_scaled_in_replicas_fixed
