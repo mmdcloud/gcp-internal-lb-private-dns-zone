@@ -255,37 +255,38 @@ module "lb" {
 # --------------------------------------------------------------------------
 # Private DNS Zone
 # --------------------------------------------------------------------------
-resource "google_dns_managed_zone" "private_zone" {
-  project     = var.project_id
-  name        = var.dns_zone_name
-  dns_name    = "${var.dns_name}."
-  description = "Private DNS zone managed by Terraform"
-  visibility  = "private"
-  private_visibility_config {
-    networks {
-      network_url = module.consumer_vpc.self_link
-    }
-    networks {
-      network_url = module.producer_vpc.self_link
-    }
-    # dynamic "networks" {
-    #   for_each = var.vpc_network_self_links
-    #   content {
-    #     network_url = networks.value
-    #   }
-    # }
-  }
-}
+# resource "google_dns_managed_zone" "private_zone" {
+#   project     = var.project_id
+#   name        = var.dns_zone_name
+#   dns_name    = "${var.dns_name}."
+#   description = "Private DNS zone managed by Terraform"
+#   visibility  = "private"
+#   private_visibility_config {
+#     networks {
+#       network_url = module.consumer_vpc.self_link
+#     }
+#     networks {
+#       network_url = module.producer_vpc.self_link
+#     }
+#     # dynamic "networks" {
+#     #   for_each = var.vpc_network_self_links
+#     #   content {
+#     #     network_url = networks.value
+#     #   }
+#     # }
+#   }
+#   depends_on = [module.lb]
+# }
 
-resource "google_dns_record_set" "record" {
-  project      = var.project_id
-  name         = var.record_name
-  type         = "A"
-  ttl          = var.ttl
-  managed_zone = google_dns_managed_zone.private_zone.name
+# resource "google_dns_record_set" "record" {
+#   project      = var.project_id
+#   name         = var.record_name
+#   type         = "A"
+#   ttl          = var.ttl
+#   managed_zone = google_dns_managed_zone.private_zone.name
 
-  rrdatas = [module.lb.lb_ip_address]
-}
+#   rrdatas = [module.lb.lb_ip_address]
+# }
 
 # --------------------------------------------------------------------------
 # Compute Instances

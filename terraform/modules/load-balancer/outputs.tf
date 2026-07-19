@@ -28,20 +28,20 @@ output "health_check_ids" {
   value       = local.health_check_ids
 }
 
-output "managed_ssl_certificate_id" {
-  description = "ID of the Google-managed SSL certificate, if created."
-  value       = var.managed_ssl_certificate ? google_compute_managed_ssl_certificate.this[0].id : null
-}
+# output "managed_ssl_certificate_id" {
+#   description = "ID of the Google-managed SSL certificate, if created."
+#   value       = var.managed_ssl_certificate ? google_compute_managed_ssl_certificate.this[0].id : null
+# }
 
 output "security_policy_id" {
   description = "ID of the Cloud Armor security policy, if enabled."
   value       = var.enable_cloud_armor ? google_compute_security_policy.this[0].id : null
 }
 
-output "https_forwarding_rule_id" {
-  description = "ID of the HTTPS (443) global forwarding rule."
-  value       = google_compute_global_forwarding_rule.https.id
-}
+# output "https_forwarding_rule_id" {
+#   description = "ID of the HTTPS (443) global forwarding rule."
+#   value       = google_compute_global_forwarding_rule.https.id
+# }
 
 output "http_forwarding_rule_id" {
   description = "ID of the HTTP (80) redirect forwarding rule, if enabled."

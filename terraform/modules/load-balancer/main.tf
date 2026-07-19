@@ -294,59 +294,59 @@ resource "google_compute_global_forwarding_rule" "http" {
 # Managed SSL certificate / SSL policy
 ############################################
 
-resource "google_compute_managed_ssl_certificate" "this" {
-  count = var.managed_ssl_certificate ? 1 : 0
+# resource "google_compute_managed_ssl_certificate" "this" {
+#   count = var.managed_ssl_certificate ? 1 : 0
 
-  project = var.project_id
-  name    = "${var.name}-cert"
+#   project = var.project_id
+#   name    = "${var.name}-cert"
 
-  managed {
-    domains = var.domains
-  }
+#   managed {
+#     domains = var.domains
+#   }
 
-  lifecycle {
-    create_before_destroy = true
-  }
-}
+#   lifecycle {
+#     create_before_destroy = true
+#   }
+# }
 
-resource "google_compute_ssl_policy" "this" {
-  project         = var.project_id
-  name            = "${var.name}-ssl-policy"
-  profile         = var.ssl_policy_profile
-  min_tls_version = var.ssl_policy_min_tls_version
-}
+# resource "google_compute_ssl_policy" "this" {
+#   project         = var.project_id
+#   name            = "${var.name}-ssl-policy"
+#   profile         = var.ssl_policy_profile
+#   min_tls_version = var.ssl_policy_min_tls_version
+# }
 
-############################################
-# HTTPS proxy + forwarding rule (port 443)
-############################################
+# ############################################
+# # HTTPS proxy + forwarding rule (port 443)
+# ############################################
 
-resource "google_compute_target_https_proxy" "this" {
-  project = var.project_id
-  name    = "${var.name}-https-proxy"
-  url_map = google_compute_url_map.this.id
+# resource "google_compute_target_https_proxy" "this" {
+#   project = var.project_id
+#   name    = "${var.name}-https-proxy"
+#   url_map = google_compute_url_map.this.id
 
-  ssl_certificates = var.managed_ssl_certificate ? [google_compute_managed_ssl_certificate.this[0].id] : var.ssl_certificate_ids
-  ssl_policy       = google_compute_ssl_policy.this.id
-}
+#   ssl_certificates = var.managed_ssl_certificate ? [google_compute_managed_ssl_certificate.this[0].id] : var.ssl_certificate_ids
+#   ssl_policy       = google_compute_ssl_policy.this.id
+# }
 
-resource "google_compute_global_forwarding_rule" "https" {
-  project               = var.project_id
-  name                  = "${var.name}-https-fr"
-  target                = google_compute_target_https_proxy.this.id
-  port_range            = "443"
-  ip_address             = local.lb_ipv4_address
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  labels                = var.labels
-}
+# resource "google_compute_global_forwarding_rule" "https" {
+#   project               = var.project_id
+#   name                  = "${var.name}-https-fr"
+#   target                = google_compute_target_https_proxy.this.id
+#   port_range            = "443"
+#   ip_address             = local.lb_ipv4_address
+#   load_balancing_scheme = "EXTERNAL_MANAGED"
+#   labels                = var.labels
+# }
 
-resource "google_compute_global_forwarding_rule" "https_ipv6" {
-  count = var.enable_ipv6 ? 1 : 0
+# resource "google_compute_global_forwarding_rule" "https_ipv6" {
+#   count = var.enable_ipv6 ? 1 : 0
 
-  project               = var.project_id
-  name                  = "${var.name}-https-fr-ipv6"
-  target                = google_compute_target_https_proxy.this.id
-  port_range            = "443"
-  ip_address             = var.create_static_ip ? google_compute_global_address.ipv6[0].address : null
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  labels                = var.labels
-}
+#   project               = var.project_id
+#   name                  = "${var.name}-https-fr-ipv6"
+#   target                = google_compute_target_https_proxy.this.id
+#   port_range            = "443"
+#   ip_address             = var.create_static_ip ? google_compute_global_address.ipv6[0].address : null
+#   load_balancing_scheme = "EXTERNAL_MANAGED"
+#   labels                = var.labels
+# }

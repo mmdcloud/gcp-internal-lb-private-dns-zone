@@ -31,13 +31,13 @@ variable "domain" {
 variable "dns_name" {
   description = "The DNS domain name for the zone, must end with a dot, e.g. internal.example.com."
   type        = string
-  default     = "internal.example.com."
+  default     = "example.com"
 }
 
 variable "record_name" {
   description = "Fully qualified name for the A record, must end with a dot"
   type        = string
-  default     = "app.internal.example.com."
+  default     = "internal.example.com."
 }
 
 variable "record_ip" {
