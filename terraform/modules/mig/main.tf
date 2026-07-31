@@ -98,6 +98,7 @@ resource "google_compute_region_instance_group_manager" "this" {
       target_size, # let the autoscaler own this once enabled
     ]
   }
+  depends_on = [ google_compute_health_check.this ]
 }
 
 resource "google_compute_region_autoscaler" "this" {

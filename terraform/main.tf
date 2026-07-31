@@ -250,6 +250,7 @@ module "lb" {
 
   enable_cloud_armor   = false
   enable_http_redirect = false
+  depends_on           = [module.mig]
 }
 
 # --------------------------------------------------------------------------

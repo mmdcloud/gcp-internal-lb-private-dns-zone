@@ -1,7 +1,6 @@
 ############################################
 # Global static IP(s)
 ############################################
-
 resource "google_compute_global_address" "ipv4" {
   count = var.create_static_ip ? 1 : 0
 
@@ -28,7 +27,6 @@ locals {
 # Per-backend health checks (only created when
 # the caller doesn't pass an existing health_check_id)
 ############################################
-
 resource "google_compute_health_check" "this" {
   for_each = { for k, v in var.backends : k => v if v.manage_health_check }
 
@@ -55,7 +53,6 @@ locals {
 ############################################
 # Cloud Armor security policy
 ############################################
-
 resource "google_compute_security_policy" "this" {
   count = var.enable_cloud_armor ? 1 : 0
 
@@ -160,7 +157,6 @@ resource "google_compute_security_policy" "this" {
 ############################################
 # Backend services
 ############################################
-
 resource "google_compute_backend_service" "this" {
   for_each = var.backends
 
@@ -227,7 +223,11 @@ resource "google_compute_url_map" "this" {
   project         = var.project_id
   name            = "${var.name}-url-map"
   default_service = google_compute_backend_service.this[local.default_backend_key].id
-
+  default_url_redirect {
+    https_redirect         = false
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+    strip_query             = false
+  }
   dynamic "host_rule" {
     for_each = local.routed_backends
     content {
@@ -256,26 +256,25 @@ resource "google_compute_url_map" "this" {
 ############################################
 # HTTP -> HTTPS redirect (port 80)
 ############################################
+# resource "google_compute_url_map" "http_redirect" {
+#   count = var.enable_http_redirect ? 1 : 0
 
-resource "google_compute_url_map" "https_redirect" {
-  count = var.enable_http_redirect ? 1 : 0
+#   project = var.project_id
+#   name    = "${var.name}-http-redirect"
 
-  project = var.project_id
-  name    = "${var.name}-https-redirect"
-
-  default_url_redirect {
-    https_redirect         = true
-    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
-    strip_query             = false
-  }
-}
+#   default_url_redirect {
+#     https_redirect         = false
+#     redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+#     strip_query             = false
+#   }
+# }
 
 resource "google_compute_target_http_proxy" "this" {
   count = var.enable_http_redirect ? 1 : 0
 
   project = var.project_id
   name    = "${var.name}-http-proxy"
-  url_map = google_compute_url_map.https_redirect[0].id
+  url_map = google_compute_url_map.this.id
 }
 
 resource "google_compute_global_forwarding_rule" "http" {
