@@ -48,7 +48,7 @@ variable "domains" {
 variable "managed_ssl_certificate" {
   description = "Whether to provision a Google-managed SSL certificate from var.domains. Set false to supply your own certificate(s) via ssl_certificate_ids."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "ssl_certificate_ids" {
@@ -206,6 +206,24 @@ variable "cloud_armor_denylist_ip_ranges" {
 
 variable "enable_logging" {
   description = "Whether to enable backend service access logging (exported to Cloud Logging)."
+  type        = bool
+  default     = true
+}
+
+variable "enable_ssl" {
+  description = "Whether to enable SSL or not"
+  type        = bool
+  default     = true
+}
+
+variable "enable_http" {
+  description = "Whether to enable http or not"
+  type        = bool
+  default     = true
+}
+
+variable "https_redirect" {
+  description = "Whether to redirect http to https or not"
   type        = bool
   default     = true
 }

@@ -35,20 +35,9 @@ module "producer_vpc" {
       ]
     },
     {
-      name          = "producer-vpc-firewall-https"
-      target_tags   = ["producer-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["443"]
-        }
-      ]
-    },
-    {
       name          = "producer-vpc-firewall-ssh"
       target_tags   = ["producer-instance"]
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       allow_list = [
         {
           protocol = "tcp"
@@ -88,20 +77,9 @@ module "consumer_vpc" {
       ]
     },
     {
-      name          = "consumer-vpc-firewall-https"
-      target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["443"]
-        }
-      ]
-    },
-    {
       name          = "consumer-vpc-firewall-ssh"
       target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       allow_list = [
         {
           protocol = "tcp"
@@ -231,8 +209,7 @@ module "mig" {
 # Load Balancer
 # -----------------------------------------------------------------------------------------
 module "lb" {
-  source = "./modules/load-balancer"
-
+  source     = "./modules/load-balancer"
   project_id = var.project_id
   name       = "lb"
   backends = {
@@ -247,10 +224,11 @@ module "lb" {
       ]
     }
   }
-
-  enable_cloud_armor   = false
-  enable_http_redirect = false
-  depends_on           = [module.mig]
+  enable_ssl = false
+  enable_http = true
+  managed_ssl_certificate = false
+  enable_cloud_armor = false
+  depends_on         = [module.mig]
 }
 
 # --------------------------------------------------------------------------
@@ -292,13 +270,6 @@ module "lb" {
 # --------------------------------------------------------------------------
 # Compute Instances
 # --------------------------------------------------------------------------
-
-# Consumer Instance
-# resource "google_compute_address" "consumer_instance_address" {
-#   name = "consumer-instance-address"
-#   region = var.consumer_region
-# }
-
 module "consumer_instance" {
   source                    = "./modules/compute"
   name                      = "consumer-instance"
