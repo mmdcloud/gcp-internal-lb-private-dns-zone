@@ -14,12 +14,20 @@ module "producer_vpc" {
   routing_mode                    = "REGIONAL"
   subnets = [
     {
-      name                     = "producer-subnet"
+      name                     = "mig-subnet"
       region                   = var.producer_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.1.0.0/24"
+      ip_cidr_range            = "10.1.10.0/24"
+    },
+    {
+      name                     = "lb-subnet"
+      region                   = var.producer_region
+      purpose                  = "PRIVATE"
+      role                     = "ACTIVE"
+      private_ip_google_access = true
+      ip_cidr_range            = "10.1.20.0/24"
     }
   ]
   firewall_data = [
@@ -209,9 +217,17 @@ module "mig" {
 # Load Balancer
 # -----------------------------------------------------------------------------------------
 module "lb" {
-  source     = "./modules/load-balancer"
-  project_id = var.project_id
-  name       = "lb"
+  source             = "./modules/load-balancer"
+  project_id         = var.project_id
+  name               = "internal-lb"
+  load_balancer_type = "INTERNAL"
+  region             = var.producer_region
+  network            = module.producer_vpc.self_link
+  subnetwork         = module.producer_vpc.subnets[0].self_link
+
+  create_proxy_only_subnet = true
+  proxy_only_subnet_cidr   = "10.10.10.0/24"
+
   backends = {
     lb = {
       is_default          = true
@@ -224,11 +240,12 @@ module "lb" {
       ]
     }
   }
-  enable_ssl = false
-  enable_http = true
+  allow_global_access     = true
+  enable_ssl              = false
+  enable_http             = true
   managed_ssl_certificate = false
-  enable_cloud_armor = false
-  depends_on         = [module.mig]
+  enable_cloud_armor      = false
+  depends_on              = [module.mig]
 }
 
 # --------------------------------------------------------------------------
