@@ -32,9 +32,13 @@ module "producer_vpc" {
   ]
   firewall_data = [
     {
-      name          = "producer-vpc-firewall-http"
-      target_tags   = ["producer-instance"]
-      source_ranges = ["0.0.0.0/0"]
+      name        = "producer-vpc-firewall-http"
+      target_tags = ["producer-instance"]
+      source_ranges = [
+        "10.10.10.0/24",  # proxy-only subnet (Envoy -> backend)
+        "130.211.0.0/22", # health check probes
+        "35.191.0.0/16"
+      ]
       allow_list = [
         {
           protocol = "tcp"
@@ -76,7 +80,7 @@ module "consumer_vpc" {
     {
       name          = "consumer-vpc-firewall-http"
       target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
+      source_ranges = ["35.235.240.0/20"]
       allow_list = [
         {
           protocol = "tcp"
@@ -251,38 +255,38 @@ module "lb" {
 # --------------------------------------------------------------------------
 # Private DNS Zone
 # --------------------------------------------------------------------------
-# resource "google_dns_managed_zone" "private_zone" {
-#   project     = var.project_id
-#   name        = var.dns_zone_name
-#   dns_name    = "${var.dns_name}."
-#   description = "Private DNS zone managed by Terraform"
-#   visibility  = "private"
-#   private_visibility_config {
-#     networks {
-#       network_url = module.consumer_vpc.self_link
-#     }
-#     networks {
-#       network_url = module.producer_vpc.self_link
-#     }
-#     # dynamic "networks" {
-#     #   for_each = var.vpc_network_self_links
-#     #   content {
-#     #     network_url = networks.value
-#     #   }
-#     # }
-#   }
-#   depends_on = [module.lb]
-# }
+resource "google_dns_managed_zone" "private_zone" {
+  project     = var.project_id
+  name        = var.dns_zone_name
+  dns_name    = "${var.dns_name}."
+  description = "Private DNS zone managed by Terraform"
+  visibility  = "private"
+  private_visibility_config {
+    networks {
+      network_url = module.consumer_vpc.self_link
+    }
+    networks {
+      network_url = module.producer_vpc.self_link
+    }
+    # dynamic "networks" {
+    #   for_each = var.vpc_network_self_links
+    #   content {
+    #     network_url = networks.value
+    #   }
+    # }
+  }
+}
 
-# resource "google_dns_record_set" "record" {
-#   project      = var.project_id
-#   name         = var.record_name
-#   type         = "A"
-#   ttl          = var.ttl
-#   managed_zone = google_dns_managed_zone.private_zone.name
+resource "google_dns_record_set" "record" {
+  project      = var.project_id
+  name         = "internal.${google_dns_managed_zone.private_zone.dns_name}"
+  type         = "A"
+  ttl          = var.ttl
+  managed_zone = google_dns_managed_zone.private_zone.name
 
-#   rrdatas = [module.lb.lb_ip_address]
-# }
+  rrdatas    = [module.lb.lb_ip_address]
+  depends_on = [module.lb]
+}
 
 # --------------------------------------------------------------------------
 # Compute Instances
