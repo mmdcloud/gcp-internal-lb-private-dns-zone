@@ -80,7 +80,7 @@ module "consumer_vpc" {
     {
       name          = "consumer-vpc-firewall-http"
       target_tags   = ["consumer-instance"]
-      source_ranges = ["35.235.240.0/20"]
+      source_ranges = ["0.0.0.0/0"]
       allow_list = [
         {
           protocol = "tcp"
@@ -268,12 +268,6 @@ resource "google_dns_managed_zone" "private_zone" {
     networks {
       network_url = module.producer_vpc.self_link
     }
-    # dynamic "networks" {
-    #   for_each = var.vpc_network_self_links
-    #   content {
-    #     network_url = networks.value
-    #   }
-    # }
   }
 }
 
@@ -283,9 +277,8 @@ resource "google_dns_record_set" "record" {
   type         = "A"
   ttl          = var.ttl
   managed_zone = google_dns_managed_zone.private_zone.name
-
-  rrdatas    = [module.lb.lb_ip_address]
-  depends_on = [module.lb]
+  rrdatas      = [module.lb.lb_ip_address]
+  depends_on   = [module.lb]
 }
 
 # --------------------------------------------------------------------------
