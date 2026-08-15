@@ -52,6 +52,11 @@ variable "ttl" {
   default     = 300
 }
 
+variable "proxy_only_subnet_cidr" {
+  description = "Proxy subnet cidr"
+  type        = string
+}
+
 # List of existing VPC self_links to attach to the private zone
 variable "vpc_network_self_links" {
   description = "List of VPC network self_links to authorize for this private zone"

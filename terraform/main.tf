@@ -35,8 +35,8 @@ module "producer_vpc" {
       name        = "producer-vpc-firewall-http"
       target_tags = ["producer-instance"]
       source_ranges = [
-        "10.10.10.0/24",  # proxy-only subnet (Envoy -> backend)
-        "130.211.0.0/22", # health check probes
+        var.proxy_only_subnet_cidr, # proxy-only subnet (Envoy -> backend)
+        "130.211.0.0/22",           # health check probes
         "35.191.0.0/16"
       ]
       allow_list = [
@@ -77,17 +77,6 @@ module "consumer_vpc" {
     }
   ]
   firewall_data = [
-    {
-      name          = "consumer-vpc-firewall-http"
-      target_tags   = ["consumer-instance"]
-      source_ranges = ["0.0.0.0/0"]
-      allow_list = [
-        {
-          protocol = "tcp"
-          ports    = ["80"]
-        }
-      ]
-    },
     {
       name          = "consumer-vpc-firewall-ssh"
       target_tags   = ["consumer-instance"]
@@ -221,17 +210,15 @@ module "mig" {
 # Load Balancer
 # -----------------------------------------------------------------------------------------
 module "lb" {
-  source             = "./modules/load-balancer"
-  project_id         = var.project_id
-  name               = "internal-lb"
-  load_balancer_type = "INTERNAL"
-  region             = var.producer_region
-  network            = module.producer_vpc.self_link
-  subnetwork         = module.producer_vpc.subnets[0].self_link
-
+  source                   = "./modules/load-balancer"
+  project_id               = var.project_id
+  name                     = "internal-lb"
+  load_balancer_type       = "INTERNAL"
+  region                   = var.producer_region
+  network                  = module.producer_vpc.self_link
+  subnetwork               = module.producer_vpc.subnets[0].self_link
   create_proxy_only_subnet = true
-  proxy_only_subnet_cidr   = "10.10.10.0/24"
-
+  proxy_only_subnet_cidr   = var.proxy_only_subnet_cidr
   backends = {
     lb = {
       is_default          = true
