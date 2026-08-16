@@ -3,6 +3,11 @@
 # --------------------------------------------------------------------------
 data "google_project" "project" {}
 
+data "google_compute_image" "ubuntu_2404" {
+  family  = "ubuntu-2404-lts-amd64"
+  project = "ubuntu-os-cloud"
+}
+
 # --------------------------------------------------------------------------
 # VPC Configuration
 # --------------------------------------------------------------------------
@@ -105,8 +110,12 @@ resource "google_compute_router_nat" "router_nat" {
   router                             = google_compute_router.router.name
   region                             = google_compute_router.router.region
   nat_ip_allocate_option             = "AUTO_ONLY"
-  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+  source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
   type                               = "PUBLIC"
+  subnetwork {
+    name                    = module.producer_vpc.subnets_by_name["mig-subnet"].self_link
+    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+  }
   log_config {
     enable = true
     filter = "ERRORS_ONLY"
@@ -145,12 +154,12 @@ module "instance_template" {
 
   name_prefix       = "producer-instance-template"
   machine_type      = "e2-medium"
-  source_image      = "ubuntu-minimal-2604-resolute-amd64-v20260704"
+  source_image      = data.google_compute_image.ubuntu_2404.self_link
   boot_disk_size_gb = 50
   boot_disk_type    = "pd-balanced"
 
   network          = module.producer_vpc.self_link
-  subnetwork       = module.producer_vpc.subnets[0].self_link
+  subnetwork       = module.producer_vpc.subnets_by_name["mig-subnet"].self_link
   assign_public_ip = false
   network_tags     = ["producer-instance"]
 
@@ -169,9 +178,9 @@ module "instance_template" {
   EOT
 
   labels = {
-    environment = "production"
-    team        = "platform"
+    team = "platform"
   }
+  # lifecycle { create_before_destroy = true }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -197,12 +206,12 @@ module "mig" {
   }
 
   autoscaling = {
-    min_replicas = 1
+    min_replicas = 2
     max_replicas = 5
   }
 
   labels = {
-    env = "dev"
+    team = "platform"
   }
 }
 
@@ -210,15 +219,17 @@ module "mig" {
 # Load Balancer
 # -----------------------------------------------------------------------------------------
 module "lb" {
-  source                   = "./modules/load-balancer"
-  project_id               = var.project_id
-  name                     = "internal-lb"
-  load_balancer_type       = "INTERNAL"
-  region                   = var.producer_region
-  network                  = module.producer_vpc.self_link
-  subnetwork               = module.producer_vpc.subnets[0].self_link
+  source             = "./modules/load-balancer"
+  project_id         = var.project_id
+  name               = "internal-lb"
+  load_balancer_type = "INTERNAL"
+  region             = var.producer_region
+  network            = module.producer_vpc.self_link
+  subnetwork         = module.producer_vpc.subnets_by_name["lb-subnet"].self_link
+
   create_proxy_only_subnet = true
   proxy_only_subnet_cidr   = var.proxy_only_subnet_cidr
+
   backends = {
     lb = {
       is_default          = true
@@ -231,6 +242,7 @@ module "lb" {
       ]
     }
   }
+
   allow_global_access     = true
   enable_ssl              = false
   enable_http             = true
@@ -276,14 +288,13 @@ module "consumer_instance" {
   name                      = "consumer-instance"
   machine_type              = "e2-micro"
   zone                      = "${var.consumer_region}-a"
-  metadata_startup_script   = "sudo apt-get update; sudo apt-get install nginx -y"
   deletion_protection       = false
   allow_stopping_for_update = true
-  image                     = "ubuntu-os-cloud/ubuntu-2004-focal-v20220712"
+  image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
-      network        = "${module.consumer_vpc.vpc_id}"
-      subnetwork     = "${module.consumer_vpc.subnets[0].id}"
+      network        = "${module.consumer_vpc.self_link}"
+      subnetwork     = module.consumer_vpc.subnets_by_name["consumer-subnet"].self_link
       access_configs = []
     }
   ]

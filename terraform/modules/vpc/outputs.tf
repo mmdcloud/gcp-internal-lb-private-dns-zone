@@ -14,3 +14,7 @@ output "subnets" {
   value = google_compute_subnetwork.subnets[*]
 }
 
+output "subnets_by_name" {
+  description = "Map of subnet name -> subnet object"
+  value       = { for s in google_compute_subnetwork.subnets : s.name => s }
+}

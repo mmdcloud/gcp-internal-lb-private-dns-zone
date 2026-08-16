@@ -3,7 +3,10 @@ variable "machine_type" {}
 variable "zone" {}
 variable  "deletion_protection" {}
 variable  "allow_stopping_for_update" {}
-variable "metadata_startup_script" {}
+variable "metadata_startup_script" {
+  type = optional(string)
+  default = null
+}
 variable "image" {}
 variable "network_interfaces" {
   type = list(object({
