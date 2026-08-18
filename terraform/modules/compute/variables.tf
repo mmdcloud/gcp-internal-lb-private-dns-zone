@@ -1,16 +1,16 @@
 variable "name" {}
 variable "machine_type" {}
 variable "zone" {}
-variable  "deletion_protection" {}
-variable  "allow_stopping_for_update" {}
+variable "deletion_protection" {}
+variable "allow_stopping_for_update" {}
 variable "metadata_startup_script" {
-  type = optional(string)
+  type    = string
   default = null
 }
 variable "image" {}
 variable "network_interfaces" {
   type = list(object({
-    network = string
+    network    = string
     subnetwork = string
     access_configs = list(object({
       nat_ip = string
@@ -18,6 +18,6 @@ variable "network_interfaces" {
   }))
 }
 variable "tags" {
-  type = list(string)
-  default = []    
+  type    = list(string)
+  default = []
 }
