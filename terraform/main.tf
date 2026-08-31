@@ -288,7 +288,7 @@ module "consumer_instance" {
   name                      = "consumer-instance"
   machine_type              = "e2-micro"
   zone                      = "${var.consumer_region}-a"
-  deletion_protection       = false
+  deletion_protection       = false # should be true for production
   allow_stopping_for_update = true
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [

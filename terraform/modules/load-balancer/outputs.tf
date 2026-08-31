@@ -13,9 +13,14 @@ output "backend_service_ids" {
   value       = { for k, v in google_compute_backend_service.this : k => v.id }
 }
 
-output "backend_service_self_links" {
-  description = "Map of backend key to backend service self link."
-  value       = { for k, v in google_compute_backend_service.this : k => v.self_link }
+output "backend_service_names" {
+  description = "Map of backend key to backend service name — needed for IAM bindings like google_iap_web_backend_service_iam_binding, which expects a name, not a self_link."
+  value = merge(
+    { for k, v in google_compute_backend_service.this : k => v.name },
+    { for k, v in google_compute_backend_service.serverless : k => v.name },
+    { for k, v in google_compute_region_backend_service.this : k => v.name },
+    { for k, v in google_compute_region_backend_service.serverless : k => v.name }
+  )
 }
 
 output "health_check_ids" {
@@ -31,6 +36,16 @@ output "health_check_ids" {
 output "security_policy_id" {
   description = "ID of the Cloud Armor security policy, if enabled."
   value       = var.enable_cloud_armor ? google_compute_security_policy.this[0].id : null
+}
+
+output "http_forwarding_rule_id" {
+  description = "ID of the Cloud Armor security policy, if enabled."
+  value       = try(google_compute_forwarding_rule.http[0].id, null)
+}
+
+output "global_http_forwarding_rule_id" {
+  description = "ID of the Cloud Armor security policy, if enabled."
+  value       = try(google_compute_global_forwarding_rule.http[0].id, null)
 }
 
 # output "https_forwarding_rule_id" {
