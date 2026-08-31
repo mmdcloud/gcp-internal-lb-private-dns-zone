@@ -22,28 +22,10 @@ variable "dns_zone_name" {
   default     = "internal-private-zone"
 }
 
-variable "domain" {
-  description = "Domain Name"
-  type        = string
-  default     = null
-}
-
 variable "dns_name" {
   description = "The DNS domain name for the zone, must end with a dot"
   type        = string
   default     = null
-}
-
-variable "record_name" {
-  description = "Fully qualified name for the A record, must end with a dot"
-  type        = string
-  default     = null
-}
-
-variable "record_ip" {
-  description = "IP address for the A record"
-  type        = string
-  default     = "10.10.10.10"
 }
 
 variable "ttl" {
@@ -55,11 +37,4 @@ variable "ttl" {
 variable "proxy_only_subnet_cidr" {
   description = "Proxy subnet cidr"
   type        = string
-}
-
-# List of existing VPC self_links to attach to the private zone
-variable "vpc_network_self_links" {
-  description = "List of VPC network self_links to authorize for this private zone"
-  type        = list(string)
-  default     = []
 }

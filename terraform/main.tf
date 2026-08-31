@@ -293,7 +293,7 @@ module "consumer_instance" {
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
-      network        = "${module.consumer_vpc.self_link}"
+      network        = module.consumer_vpc.self_link
       subnetwork     = module.consumer_vpc.subnets_by_name["consumer-subnet"].self_link
       access_configs = []
     }
