@@ -4,8 +4,8 @@
 data "google_project" "project" {}
 
 data "google_compute_image" "ubuntu_2404" {
-  family  = "ubuntu-2404-lts-amd64"
-  project = "ubuntu-os-cloud"
+  family  = var.image_family
+  project = var.image_project
 }
 
 # --------------------------------------------------------------------------
@@ -13,52 +13,51 @@ data "google_compute_image" "ubuntu_2404" {
 # --------------------------------------------------------------------------
 module "producer_vpc" {
   source                          = "./modules/vpc"
-  vpc_name                        = "producer-vpc"
+  vpc_name                        = var.producer_vpc_name
   delete_default_routes_on_create = false
   auto_create_subnetworks         = false
   routing_mode                    = "REGIONAL"
   subnets = [
     {
-      name                     = "mig-subnet"
+      name                     = var.mig_subnet_name
       region                   = var.producer_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.1.10.0/24"
+      ip_cidr_range            = var.mig_subnet_cidr
     },
     {
-      name                     = "lb-subnet"
+      name                     = var.lb_subnet_name
       region                   = var.producer_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.1.20.0/24"
+      ip_cidr_range            = var.lb_subnet_cidr
     }
   ]
   firewall_data = [
     {
       name        = "producer-vpc-firewall-http"
-      target_tags = ["producer-instance"]
-      source_ranges = [
-        var.proxy_only_subnet_cidr, # proxy-only subnet (Envoy -> backend)
-        "130.211.0.0/22",           # health check probes
-        "35.191.0.0/16"
-      ]
+      target_tags = [var.producer_instance_tag]
+      source_ranges = concat(
+        [var.proxy_only_subnet_cidr],  # proxy-only subnet (Envoy -> backend)
+        var.health_check_source_ranges # GCP health check probe ranges
+      )
       allow_list = [
         {
           protocol = "tcp"
-          ports    = ["80"]
+          ports    = [var.http_port]
         }
       ]
     },
     {
       name          = "producer-vpc-firewall-ssh"
-      target_tags   = ["producer-instance"]
-      source_ranges = ["35.235.240.0/20"]
+      target_tags   = [var.producer_instance_tag]
+      source_ranges = var.iap_ssh_source_ranges
       allow_list = [
         {
           protocol = "tcp"
-          ports    = ["22"]
+          ports    = [var.ssh_port]
         }
       ]
     }
@@ -67,29 +66,29 @@ module "producer_vpc" {
 
 module "consumer_vpc" {
   source                          = "./modules/vpc"
-  vpc_name                        = "consumer-vpc"
+  vpc_name                        = var.consumer_vpc_name
   delete_default_routes_on_create = false
   auto_create_subnetworks         = false
   routing_mode                    = "REGIONAL"
   subnets = [
     {
-      name                     = "consumer-subnet"
+      name                     = var.consumer_subnet_name
       region                   = var.consumer_region
       purpose                  = "PRIVATE"
       role                     = "ACTIVE"
       private_ip_google_access = true
-      ip_cidr_range            = "10.2.0.0/24"
+      ip_cidr_range            = var.consumer_subnet_cidr
     }
   ]
   firewall_data = [
     {
       name          = "consumer-vpc-firewall-ssh"
-      target_tags   = ["consumer-instance"]
-      source_ranges = ["35.235.240.0/20"]
+      target_tags   = [var.consumer_instance_tag]
+      source_ranges = var.iap_ssh_source_ranges
       allow_list = [
         {
           protocol = "tcp"
-          ports    = ["22"]
+          ports    = [var.ssh_port]
         }
       ]
     }
@@ -105,23 +104,23 @@ module "consumer_vpc" {
 # }
 
 # --------------------------------------------------------------------------
-# NAT Gateway and Cloud Router Configuration  
+# NAT Gateway and Cloud Router Configuration
 # --------------------------------------------------------------------------
 resource "google_compute_router" "router" {
-  name    = "router"
+  name    = var.router_name
   region  = var.producer_region
   network = module.producer_vpc.self_link
 }
 
 resource "google_compute_router_nat" "router_nat" {
-  name                               = "router-nat"
+  name                               = var.router_nat_name
   router                             = google_compute_router.router.name
   region                             = google_compute_router.router.region
   nat_ip_allocate_option             = "AUTO_ONLY"
   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
   type                               = "PUBLIC"
   subnetwork {
-    name                    = module.producer_vpc.subnets_by_name["mig-subnet"].self_link
+    name                    = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
     source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
   }
   log_config {
@@ -134,7 +133,7 @@ resource "google_compute_router_nat" "router_nat" {
 # VPC Network Peering
 # --------------------------------------------------------------------------
 resource "google_compute_network_peering" "producer_to_consumer_peering" {
-  name                 = "producer-consumer"
+  name                 = var.peering_producer_to_consumer_name
   network              = module.producer_vpc.self_link
   peer_network         = module.consumer_vpc.self_link
   export_custom_routes = false
@@ -142,7 +141,7 @@ resource "google_compute_network_peering" "producer_to_consumer_peering" {
 }
 
 resource "google_compute_network_peering" "consumer_to_producer_peering" {
-  name                 = "consumer-producer"
+  name                 = var.peering_consumer_to_producer_name
   network              = module.consumer_vpc.self_link
   peer_network         = module.producer_vpc.self_link
   export_custom_routes = false
@@ -160,34 +159,23 @@ module "instance_template" {
   region     = var.producer_region
   project_id = data.google_project.project.project_id
 
-  name_prefix       = "producer-instance-template"
-  machine_type      = "e2-medium"
+  name_prefix       = var.instance_template_name_prefix
+  machine_type      = var.instance_template_machine_type
   source_image      = data.google_compute_image.ubuntu_2404.self_link
-  boot_disk_size_gb = 50
-  boot_disk_type    = "pd-balanced"
+  boot_disk_size_gb = var.boot_disk_size_gb
+  boot_disk_type    = var.boot_disk_type
 
   network          = module.producer_vpc.self_link
-  subnetwork       = module.producer_vpc.subnets_by_name["mig-subnet"].self_link
+  subnetwork       = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
   assign_public_ip = false
-  network_tags     = ["producer-instance"]
+  network_tags     = [var.producer_instance_tag]
 
   create_service_account = true
-  service_account_roles = [
-    "roles/logging.logWriter",
-    "roles/monitoring.metricWriter",
-  ]
+  service_account_roles  = var.service_account_roles
 
-  startup_script = <<-EOT
-    #!/bin/bash
-    set -euo pipefail
-    sudo apt-get update
-    sudo apt-get install -y nginx
-    echo "Hello World from $(hostname -f)" > /var/www/html/index.html
-  EOT
+  startup_script = var.startup_script
 
-  labels = {
-    team = "platform"
-  }
+  labels = var.common_labels
   # lifecycle { create_before_destroy = true }
 }
 
@@ -198,29 +186,27 @@ module "mig" {
   source = "./modules/mig"
 
   project_id = var.project_id
-  name       = "mig"
+  name       = var.mig_name
   region     = var.producer_region
 
   instance_template = module.instance_template.self_link_unique
 
   named_ports = [
-    { name = "http", port = 80 }
+    { name = var.mig_named_port_name, port = var.mig_named_port_number }
   ]
 
   health_check = {
-    type         = "HTTP"
-    port         = 80
-    request_path = "/"
+    type         = var.mig_health_check_type
+    port         = var.mig_health_check_port
+    request_path = var.mig_health_check_request_path
   }
 
   autoscaling = {
-    min_replicas = 2
-    max_replicas = 5
+    min_replicas = var.mig_autoscaling_min_replicas
+    max_replicas = var.mig_autoscaling_max_replicas
   }
 
-  labels = {
-    team = "platform"
-  }
+  labels = var.common_labels
 }
 
 # -----------------------------------------------------------------------------------------
@@ -229,11 +215,11 @@ module "mig" {
 module "lb" {
   source             = "./modules/load-balancer"
   project_id         = var.project_id
-  name               = "internal-lb"
-  load_balancer_type = "INTERNAL"
+  name               = var.lb_name
+  load_balancer_type = var.lb_type
   region             = var.producer_region
   network            = module.producer_vpc.self_link
-  subnetwork         = module.producer_vpc.subnets_by_name["lb-subnet"].self_link
+  subnetwork         = module.producer_vpc.subnets_by_name[var.lb_subnet_name].self_link
 
   create_proxy_only_subnet = true
   proxy_only_subnet_cidr   = var.proxy_only_subnet_cidr
@@ -241,21 +227,26 @@ module "lb" {
   backends = {
     lb = {
       is_default          = true
-      protocol            = "HTTP"
-      port_name           = "http"
+      protocol            = var.lb_backend_protocol
+      port_name           = var.lb_backend_port_name
       health_check_id     = module.mig.health_check_id
       manage_health_check = false
       groups = [
-        { group = module.mig.instance_group_self_link }
+        {
+          group           = module.mig.instance_group_self_link
+          balancing_mode  = var.lb_balancing_mode
+          capacity_scaler = var.lb_capacity_scaler
+          max_utilization = var.lb_max_utilization
+        }
       ]
     }
   }
 
-  allow_global_access     = true
-  enable_ssl              = false
-  enable_http             = true
-  managed_ssl_certificate = false
-  enable_cloud_armor      = false
+  allow_global_access     = var.lb_allow_global_access
+  enable_ssl              = var.lb_enable_ssl
+  enable_http             = var.lb_enable_http
+  managed_ssl_certificate = var.lb_managed_ssl_certificate
+  enable_cloud_armor      = var.lb_enable_cloud_armor
   depends_on              = [module.mig]
 }
 
@@ -266,7 +257,7 @@ resource "google_dns_managed_zone" "private_zone" {
   project     = var.project_id
   name        = var.dns_zone_name
   dns_name    = "${var.dns_name}."
-  description = "Private DNS zone managed by Terraform"
+  description = var.dns_zone_description
   visibility  = "private"
   private_visibility_config {
     networks {
@@ -280,8 +271,8 @@ resource "google_dns_managed_zone" "private_zone" {
 
 resource "google_dns_record_set" "record" {
   project      = var.project_id
-  name         = "internal.${google_dns_managed_zone.private_zone.dns_name}"
-  type         = "A"
+  name         = "${var.dns_record_prefix}.${google_dns_managed_zone.private_zone.dns_name}"
+  type         = var.dns_record_type
   ttl          = var.ttl
   managed_zone = google_dns_managed_zone.private_zone.name
   rrdatas      = [module.lb.lb_ip_address]
@@ -293,18 +284,18 @@ resource "google_dns_record_set" "record" {
 # --------------------------------------------------------------------------
 module "consumer_instance" {
   source                    = "./modules/compute"
-  name                      = "consumer-instance"
-  machine_type              = "e2-micro"
-  zone                      = "${var.consumer_region}-a"
-  deletion_protection       = false # should be true for production
-  allow_stopping_for_update = true
+  name                      = var.consumer_instance_name
+  machine_type              = var.consumer_instance_machine_type
+  zone                      = "${var.consumer_region}${var.consumer_instance_zone_suffix}"
+  deletion_protection       = var.consumer_instance_deletion_protection # should be true for production
+  allow_stopping_for_update = var.consumer_instance_allow_stopping_for_update
   image                     = data.google_compute_image.ubuntu_2404.self_link
   network_interfaces = [
     {
       network        = module.consumer_vpc.self_link
-      subnetwork     = module.consumer_vpc.subnets_by_name["consumer-subnet"].self_link
+      subnetwork     = module.consumer_vpc.subnets_by_name[var.consumer_subnet_name].self_link
       access_configs = []
     }
   ]
-  tags = ["consumer-instance"]
+  tags = [var.consumer_instance_tag]
 }
