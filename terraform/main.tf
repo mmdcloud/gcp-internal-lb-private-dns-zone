@@ -96,6 +96,14 @@ module "consumer_vpc" {
   ]
 }
 
+# resource "google_iap_tunnel_instance_iam_binding" "consumer_ssh_access" {
+#   project  = var.project_id
+#   zone     = "${var.consumer_region}-a"  # match instance zone(s)
+#   instance = module.instance_template.name  # or per-instance if not using MIG-managed
+#   role     = "roles/iap.tunnelResourceAccessor"
+#   members  = var.allowed_ssh_members  # explicit list, not allUsers/allAuthenticatedUsers
+# }
+
 # --------------------------------------------------------------------------
 # NAT Gateway and Cloud Router Configuration  
 # --------------------------------------------------------------------------
@@ -118,7 +126,7 @@ resource "google_compute_router_nat" "router_nat" {
   }
   log_config {
     enable = true
-    filter = "ERRORS_ONLY"
+    filter = "ALL"
   }
 }
 

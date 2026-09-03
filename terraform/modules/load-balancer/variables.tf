@@ -107,15 +107,15 @@ variable "backends" {
     groups = list(object({
       group                        = string
       balancing_mode               = optional(string, "UTILIZATION")
-      capacity_scaler              = optional(number, 0)
-      max_connections              = optional(number, 0)
-      max_connections_per_endpoint = optional(number, 0)
-      max_connections_per_instance = optional(number, 0)
-      max_rate                     = optional(number, 0)
-      max_rate_per_endpoint        = optional(number, 0)
-      max_rate_per_instance        = optional(number, 0)
+      capacity_scaler              = optional(number, 1.0)
+      max_connections              = optional(number, null)
+      max_connections_per_endpoint = optional(number, null)
+      max_connections_per_instance = optional(number, null)
+      max_rate                     = optional(number, null)
+      max_rate_per_endpoint        = optional(number, null)
+      max_rate_per_instance        = optional(number, null)
       preference                   = optional(string, null)
-      max_utilization              = optional(number, 0)
+      max_utilization              = optional(number, 0.8)
     }))
 
     health_check = optional(object({
