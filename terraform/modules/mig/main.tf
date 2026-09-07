@@ -1,5 +1,6 @@
 resource "google_compute_health_check" "this" {
-  project             = var.project_id
+  project = var.project_id
+
   name                = "${var.name}-hc"
   check_interval_sec  = var.health_check.check_interval_sec
   timeout_sec         = var.health_check.timeout_sec
@@ -53,13 +54,80 @@ resource "google_compute_health_check" "this" {
 }
 
 resource "google_compute_region_instance_group_manager" "this" {
-  project     = var.project_id
+  project = var.project_id
+
   name        = "${var.name}-mig"
   description = var.description
   region      = var.region
 
   base_instance_name = var.name
   target_size        = var.target_size
+
+  distribution_policy_target_shape = var.distribution_policy_target_shape
+  list_managed_instances_results   = var.list_managed_instances_results
+
+  wait_for_instances        = var.wait_for_instances
+  wait_for_instances_status = var.wait_for_instances_status
+
+  target_pools          = var.target_pools
+  target_stopped_size   = var.target_stopped_size
+  target_suspended_size = var.target_suspended_size
+
+  distribution_policy_zones = length(var.distribution_zones) > 0 ? var.distribution_zones : null
+
+  dynamic "stateful_disk" {
+    for_each = var.stateful_disk != null ? var.stateful_disk : []
+    content {
+      delete_rule = stateful_disk.value.delete_rule
+      device_name = stateful_disk.value.device_name
+    }
+  }
+
+  dynamic "stateful_external_ip" {
+    for_each = length(var.stateful_external_ip) > 0 ? var.stateful_external_ip : []
+    content {
+      delete_rule    = stateful_external_ip.value.delete_rule
+      interface_name = stateful_external_ip.value.interface_name
+    }
+  }
+
+  dynamic "all_instances_config" {
+    for_each = var.all_instances_config != null ? [var.all_instances_config] : []
+    content {
+      labels   = all_instances_config.value.labels
+      metadata = all_instances_config.value.metadata
+    }
+  }
+
+  dynamic "stateful_internal_ip" {
+    for_each = length(var.stateful_internal_ip) > 0 ? var.stateful_internal_ip : []
+    content {
+      interface_name = stateful_internal_ip.value.interface_name
+      delete_rule    = stateful_internal_ip.value.delete_rule
+    }
+  }
+
+  dynamic "instance_flexibility_policy" {
+    for_each = var.instance_flexibility_policy != null ? [var.instance_flexibility_policy] : []
+    content {
+      dynamic "instance_selections" {
+        for_each = instance_flexibility_policy.value.instance_selections
+        content {
+          name          = instance_selections.value.name
+          rank          = instance_selections.value.rank
+          machine_types = instance_selections.value.machine_types
+        }
+      }
+    }
+  }
+
+  dynamic "instance_lifecycle_policy" {
+    for_each = var.instance_lifecycle_policy != null ? [var.instance_lifecycle_policy] : []
+    content {
+      default_action_on_failure = instance_lifecycle_policy.value.default_action_on_failure
+      force_update_on_repair    = instance_lifecycle_policy.value.force_update_on_repair
+    }
+  }
 
   version {
     instance_template = var.instance_template
@@ -72,10 +140,6 @@ resource "google_compute_region_instance_group_manager" "this" {
       port = named_port.value.port
     }
   }
-
-  # distribution_policy_zones accepts a list of zone URIs/names within var.region.
-  # Leave var.distribution_zones empty to let GCP choose zones automatically.
-  distribution_policy_zones = length(var.distribution_zones) > 0 ? var.distribution_zones : null
 
   auto_healing_policies {
     health_check      = google_compute_health_check.this.id
@@ -98,7 +162,7 @@ resource "google_compute_region_instance_group_manager" "this" {
       target_size, # let the autoscaler own this once enabled
     ]
   }
-  depends_on = [ google_compute_health_check.this ]
+  depends_on = [google_compute_health_check.this]
 }
 
 resource "google_compute_region_autoscaler" "this" {

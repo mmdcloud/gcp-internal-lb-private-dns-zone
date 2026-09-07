@@ -66,13 +66,13 @@ variable "named_ports" {
 variable "update_policy" {
   description = "Rolling update policy for the MIG."
   type = object({
-    type                     = optional(string, "PROACTIVE") # PROACTIVE or OPPORTUNISTIC
-    minimal_action           = optional(string, "REPLACE")   # REPLACE or RESTART
-    max_surge_fixed          = optional(number, 3)
-    max_surge_percent        = optional(number, null)
-    max_unavailable_fixed    = optional(number, 0)
-    max_unavailable_percent  = optional(number, null)
-    replacement_method       = optional(string, "SUBSTITUTE") # SUBSTITUTE or RECREATE
+    type                    = optional(string, "PROACTIVE") # PROACTIVE or OPPORTUNISTIC
+    minimal_action          = optional(string, "REPLACE")   # REPLACE or RESTART
+    max_surge_fixed         = optional(number, 3)
+    max_surge_percent       = optional(number, null)
+    max_unavailable_fixed   = optional(number, 0)
+    max_unavailable_percent = optional(number, null)
+    replacement_method      = optional(string, "SUBSTITUTE") # SUBSTITUTE or RECREATE
   })
   default = {}
 }
@@ -127,4 +127,90 @@ variable "autoscaling" {
     }), {})
   })
   default = {}
+}
+
+variable "distribution_policy_target_shape" {
+  type = string
+  default = null
+}
+
+variable "list_managed_instances_results" {
+  type = string
+  default = null
+}
+
+variable "wait_for_instances" {
+  type = bool
+  default = false
+}
+
+variable "wait_for_instances_status" {
+  type = string
+  default = "STABLE"
+}
+
+variable "target_pools" {
+  type = set(string)
+  default = []
+}
+
+variable "target_stopped_size" {
+  type = number
+  default = 0
+}
+
+variable "target_suspended_size" {
+  type = number
+  default = 0
+}
+
+variable "stateful_disk" {
+  type = set(object({
+    delete_rule = string
+    device_name = string
+  }))
+  default = []
+}
+
+variable "stateful_external_ip" {
+  type = list(object({
+    delete_rule    = string
+    interface_name = string
+  }))
+  default = []
+}
+
+variable "stateful_internal_ip" {
+  type = list(object({
+    delete_rule    = string
+    interface_name = string
+  }))
+  default = []
+}
+
+variable "instance_lifecycle_policy" {
+  type = object({
+    default_action_on_failure = string
+    force_update_on_repair    = string
+  })
+  default = null
+}
+
+variable "all_instances_config" {
+  type = object({
+    labels   = map(string)
+    metadata = map(string)
+  })
+  default = null
+}
+
+variable "instance_flexibility_policy" {
+  type = object({
+    instance_selections = set(object({
+      name          = string
+      rank          = number
+      machine_types = set(string)
+    }))
+  })
+  default = null
 }
