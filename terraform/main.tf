@@ -95,14 +95,6 @@ module "consumer_vpc" {
   ]
 }
 
-# resource "google_iap_tunnel_instance_iam_binding" "consumer_ssh_access" {
-#   project  = var.project_id
-#   zone     = "${var.consumer_region}-a"  # match instance zone(s)
-#   instance = module.instance_template.name  # or per-instance if not using MIG-managed
-#   role     = "roles/iap.tunnelResourceAccessor"
-#   members  = var.allowed_ssh_members  # explicit list, not allUsers/allAuthenticatedUsers
-# }
-
 # --------------------------------------------------------------------------
 # NAT Gateway and Cloud Router Configuration
 # --------------------------------------------------------------------------
@@ -176,7 +168,6 @@ module "instance_template" {
   startup_script = var.startup_script
 
   labels = var.common_labels
-  # lifecycle { create_before_destroy = true }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -287,9 +278,19 @@ module "consumer_instance" {
   name                      = var.consumer_instance_name
   machine_type              = var.consumer_instance_machine_type
   zone                      = "${var.consumer_region}${var.consumer_instance_zone_suffix}"
-  deletion_protection       = var.consumer_instance_deletion_protection # should be true for production
+  deletion_protection       = var.consumer_instance_deletion_protection
   allow_stopping_for_update = var.consumer_instance_allow_stopping_for_update
-  image                     = data.google_compute_image.ubuntu_2404.self_link
+
+  boot_disk = {
+    auto_delete = true
+    device_name = "boot-disk"
+    mode        = "READ_WRITE"
+    image       = data.google_compute_image.ubuntu_2404.self_link
+    size        = var.consumer_instance_boot_disk_size_gb
+    type        = var.consumer_instance_boot_disk_type
+    labels      = var.consumer_labels
+  }
+
   network_interfaces = [
     {
       network        = module.consumer_vpc.self_link
@@ -297,5 +298,8 @@ module "consumer_instance" {
       access_configs = []
     }
   ]
+
+  labels = var.consumer_labels
+
   tags = [var.consumer_instance_tag]
 }

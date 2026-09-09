@@ -83,3 +83,10 @@ consumer_instance_machine_type              = "e2-micro"
 consumer_instance_zone_suffix               = "-a"
 consumer_instance_deletion_protection       = false
 consumer_instance_allow_stopping_for_update = true
+consumer_instance_boot_disk_size_gb = 10
+consumer_instance_boot_disk_type    = "pd-ssd"
+consumer_labels = {
+  environment = "production"
+  team        = "platform-eng"
+  cost_center = "cc-1042"
+}

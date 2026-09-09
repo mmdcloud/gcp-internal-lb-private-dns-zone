@@ -412,3 +412,25 @@ variable "consumer_instance_allow_stopping_for_update" {
   type        = bool
   default     = true
 }
+
+variable "consumer_instance_boot_disk_size_gb" {
+  description = "Boot disk size (GB) for the consumer compute instance."
+  type        = number
+  default     = 10
+}
+
+variable "consumer_instance_boot_disk_type" {
+  description = "Boot disk type for the consumer compute instance."
+  type        = string
+  default     = "pd-ssd"
+}
+
+variable "consumer_labels" {
+  description = "Resource labels applied to the consumer instance and its boot disk."
+  type        = map(string)
+  default = {
+    environment = "production"
+    team        = "platform-eng"
+    cost_center = "cc-1042"
+  }
+}
