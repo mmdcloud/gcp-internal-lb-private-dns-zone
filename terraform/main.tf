@@ -98,27 +98,53 @@ module "consumer_vpc" {
 # --------------------------------------------------------------------------
 # NAT Gateway and Cloud Router Configuration
 # --------------------------------------------------------------------------
-resource "google_compute_router" "router" {
-  name    = var.router_name
-  region  = var.producer_region
-  network = module.producer_vpc.self_link
-}
+# resource "google_compute_router" "router" {
+#   name    = var.router_name
+#   region  = var.producer_region
+#   network = module.producer_vpc.self_link
+# }
 
-resource "google_compute_router_nat" "router_nat" {
-  name                               = var.router_nat_name
-  router                             = google_compute_router.router.name
-  region                             = google_compute_router.router.region
-  nat_ip_allocate_option             = "AUTO_ONLY"
+# resource "google_compute_router_nat" "router_nat" {
+#   name                               = var.router_nat_name
+#   router                             = google_compute_router.router.name
+#   region                             = google_compute_router.router.region
+#   nat_ip_allocate_option             = "AUTO_ONLY"
+#   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
+#   type                               = "PUBLIC"
+#   subnetwork {
+#     name                    = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
+#     source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+#   }
+#   log_config {
+#     enable = true
+#     filter = "ALL"
+#   }
+# }
+
+module "cloud_nat" {
+  source = "./modules/cloud-nat"
+
+  project_id = var.project_id 
+  region     = var.producer_region
+
+  create_router = true
+  router        = var.router_name
+  network       = module.producer_vpc.self_link
+
+  name = var.router_nat_name
+
   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
-  type                               = "PUBLIC"
-  subnetwork {
-    name                    = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
-    source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
-  }
-  log_config {
-    enable = true
-    filter = "ALL"
-  }
+
+  subnetworks = [
+    {
+      name                     = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
+      source_ip_ranges_to_nat  = ["ALL_IP_RANGES"]
+      secondary_ip_range_names = []
+    }
+  ]
+
+  log_config_enable = true
+  log_config_filter = "ALL"
 }
 
 # --------------------------------------------------------------------------
