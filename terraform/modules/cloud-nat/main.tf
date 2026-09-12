@@ -39,6 +39,7 @@ resource "google_compute_router_nat" "main" {
   router                              = local.router
   nat_ip_allocate_option              = local.nat_ip_allocate_option
   nat_ips                             = var.nat_ips
+  type                                = var.type
   drain_nat_ips                       = var.drain_nat_ips
   source_subnetwork_ip_ranges_to_nat  = var.source_subnetwork_ip_ranges_to_nat
   min_ports_per_vm                    = var.min_ports_per_vm
@@ -79,8 +80,10 @@ resource "google_compute_router_nat" "main" {
       description = rules.value.description
       match       = rules.value.match
       action {
-        source_nat_active_ips = rules.value.action.source_nat_active_ips
-        source_nat_drain_ips  = rules.value.action.source_nat_drain_ips
+        source_nat_active_ips    = rules.value.action.source_nat_active_ips
+        source_nat_drain_ips     = rules.value.action.source_nat_drain_ips
+        source_nat_active_ranges = rules.value.action.source_nat_active_ranges
+        source_nat_drain_ranges  = rules.value.action.source_nat_drain_ranges
       }
     }
   }

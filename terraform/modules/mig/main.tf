@@ -1,3 +1,7 @@
+locals {
+  autoscaling_scale_in_enabled = var.autoscaling_scale_in_control.fixed_replicas != null || var.autoscaling_scale_in_control.percent_replicas != null
+}
+
 resource "google_compute_health_check" "this" {
   project = var.project_id
 
@@ -146,14 +150,17 @@ resource "google_compute_region_instance_group_manager" "this" {
     initial_delay_sec = var.health_check_initial_delay_sec
   }
 
-  update_policy {
-    type                    = var.update_policy.type
-    minimal_action          = var.update_policy.minimal_action
-    max_surge_fixed         = var.update_policy.max_surge_percent == null ? var.update_policy.max_surge_fixed : null
-    max_surge_percent       = var.update_policy.max_surge_percent
-    max_unavailable_fixed   = var.update_policy.max_unavailable_percent == null ? var.update_policy.max_unavailable_fixed : null
-    max_unavailable_percent = var.update_policy.max_unavailable_percent
-    replacement_method      = var.update_policy.replacement_method
+  dynamic "update_policy" {
+    for_each = var.update_policy != null ? [var.update_policy] : []
+    content {
+      type                    = update_policy.value.type
+      minimal_action          = update_policy.value.minimal_action
+      max_surge_fixed         = update_policy.value.max_surge_percent == null ? update_policy.value.max_surge_fixed : null
+      max_surge_percent       = update_policy.value.max_surge_percent
+      max_unavailable_fixed   = update_policy.value.max_unavailable_percent == null ? update_policy.value.max_unavailable_fixed : null
+      max_unavailable_percent = update_policy.value.max_unavailable_percent
+      replacement_method      = update_policy.value.replacement_method
+    }
   }
 
   lifecycle {
@@ -165,40 +172,60 @@ resource "google_compute_region_instance_group_manager" "this" {
   depends_on = [google_compute_health_check.this]
 }
 
-resource "google_compute_region_autoscaler" "this" {
-  count = var.enable_autoscaling ? 1 : 0
+resource "google_compute_region_autoscaler" "autoscaler" {
+  provider = google
+  count    = var.autoscaling_enabled ? 1 : 0
+  name     = var.autoscaler_name == "" ? "${var.hostname}-autoscaler" : var.autoscaler_name
+  project  = var.project_id
+  region   = var.region
 
-  project = var.project_id
-  name    = "${var.name}-as"
-  region  = var.region
-  target  = google_compute_region_instance_group_manager.this.id
+  target = google_compute_region_instance_group_manager.this.self_link
 
   autoscaling_policy {
-    min_replicas    = var.autoscaling.min_replicas
-    max_replicas    = var.autoscaling.max_replicas
-    cooldown_period = var.autoscaling.cooldown_period_sec
-    mode            = "ON"
-
-    cpu_utilization {
-      target            = var.autoscaling.cpu_utilization_target
-      predictive_method = var.autoscaling.cpu_predictive_method
-    }
-
-    dynamic "load_balancing_utilization" {
-      for_each = var.autoscaling.load_balancing_utilization_target != null ? [1] : []
-      content {
-        target = var.autoscaling.load_balancing_utilization_target
-      }
-    }
-
+    max_replicas    = var.max_replicas
+    min_replicas    = var.min_replicas
+    cooldown_period = var.cooldown_period
+    mode            = var.autoscaling_mode
     dynamic "scale_in_control" {
-      for_each = var.autoscaling.scale_in_control != null ? [var.autoscaling.scale_in_control] : []
+      for_each = local.autoscaling_scale_in_enabled ? [var.autoscaling_scale_in_control] : []
       content {
         max_scaled_in_replicas {
-          fixed   = scale_in_control.value.max_scaled_in_replicas_fixed
-          percent = scale_in_control.value.max_scaled_in_replicas_fixed == null ? scale_in_control.value.max_scaled_in_replicas_percent : null
+          fixed   = lookup(scale_in_control.value, "fixed_replicas", null)
+          percent = lookup(scale_in_control.value, "percent_replicas", null)
         }
-        time_window_sec = scale_in_control.value.time_window_sec
+        time_window_sec = lookup(scale_in_control.value, "time_window_sec", null)
+      }
+    }
+    dynamic "cpu_utilization" {
+      for_each = var.autoscaling_cpu
+      content {
+        target            = lookup(cpu_utilization.value, "target", null)
+        predictive_method = lookup(cpu_utilization.value, "predictive_method", null)
+      }
+    }
+    dynamic "metric" {
+      for_each = var.autoscaling_metric
+      content {
+        name   = lookup(metric.value, "name", null)
+        target = lookup(metric.value, "target", null)
+        type   = lookup(metric.value, "type", null)
+      }
+    }
+    dynamic "load_balancing_utilization" {
+      for_each = var.autoscaling_lb
+      content {
+        target = lookup(load_balancing_utilization.value, "target", null)
+      }
+    }
+    dynamic "scaling_schedules" {
+      for_each = var.scaling_schedules
+      content {
+        disabled              = lookup(scaling_schedules.value, "disabled", null)
+        duration_sec          = lookup(scaling_schedules.value, "duration_sec", null)
+        min_required_replicas = lookup(scaling_schedules.value, "min_required_replicas", null)
+        name                  = lookup(scaling_schedules.value, "name", null)
+        schedule              = lookup(scaling_schedules.value, "schedule", null)
+        time_zone             = lookup(scaling_schedules.value, "time_zone", null)
       }
     }
   }

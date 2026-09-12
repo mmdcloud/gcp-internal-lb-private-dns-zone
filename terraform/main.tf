@@ -124,14 +124,14 @@ module "consumer_vpc" {
 module "cloud_nat" {
   source = "./modules/cloud-nat"
 
-  project_id = var.project_id 
+  project_id = var.project_id
   region     = var.producer_region
 
   create_router = true
   router        = var.router_name
   network       = module.producer_vpc.self_link
-
-  name = var.router_nat_name
+  type          = "PUBLIC"
+  name          = var.router_nat_name
 
   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
 
@@ -218,10 +218,10 @@ module "mig" {
     request_path = var.mig_health_check_request_path
   }
 
-  autoscaling = {
-    min_replicas = var.mig_autoscaling_min_replicas
-    max_replicas = var.mig_autoscaling_max_replicas
-  }
+  autoscaling_enabled = true
+  autoscaler_name     = ""
+  min_replicas        = var.mig_autoscaling_min_replicas
+  max_replicas        = var.mig_autoscaling_max_replicas
 
   labels = var.common_labels
 }

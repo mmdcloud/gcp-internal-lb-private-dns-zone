@@ -32,6 +32,12 @@ variable "name" {
   default     = ""
 }
 
+variable "type" {
+  type        = string
+  description = "Defaults to 'cloud-nat-RANDOM_SUFFIX'. Changing this forces a new NAT to be created."
+  default     = "PRIVATE"
+}
+
 variable "nat_ips" {
   type        = list(string)
   description = "List of self_links of external IPs. Changing this forces a new NAT to be created. Value of `nat_ip_allocate_option` is inferred based on nat_ips. If present set to MANUAL_ONLY, otherwise AUTO_ONLY."
@@ -143,8 +149,10 @@ variable "rules" {
     match       = string
     rule_number = number
     action = object({
-      source_nat_active_ips = list(string)
-      source_nat_drain_ips  = list(string)
+      source_nat_active_ips = optional(list(string))
+      source_nat_drain_ips  = optional(list(string))
+      source_nat_active_ranges  = optional(list(string))
+      source_nat_drain_ranges  = optional(list(string))
     })
   }))
   default = []
