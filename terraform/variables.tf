@@ -359,7 +359,7 @@ variable "dns_zone_description" {
 variable "dns_name" {
   description = "DNS suffix for the private zone, e.g. 'internal.example.com'. A trailing dot is added automatically."
   type        = string
-  default     = "internal.example.com"
+  default     = "mohitd.xyz"
 }
 
 variable "dns_record_prefix" {

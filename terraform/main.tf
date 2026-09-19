@@ -98,29 +98,6 @@ module "consumer_vpc" {
 # --------------------------------------------------------------------------
 # NAT Gateway and Cloud Router Configuration
 # --------------------------------------------------------------------------
-# resource "google_compute_router" "router" {
-#   name    = var.router_name
-#   region  = var.producer_region
-#   network = module.producer_vpc.self_link
-# }
-
-# resource "google_compute_router_nat" "router_nat" {
-#   name                               = var.router_nat_name
-#   router                             = google_compute_router.router.name
-#   region                             = google_compute_router.router.region
-#   nat_ip_allocate_option             = "AUTO_ONLY"
-#   source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
-#   type                               = "PUBLIC"
-#   subnetwork {
-#     name                    = module.producer_vpc.subnets_by_name[var.mig_subnet_name].self_link
-#     source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
-#   }
-#   log_config {
-#     enable = true
-#     filter = "ALL"
-#   }
-# }
-
 module "cloud_nat" {
   source = "./modules/cloud-nat"
 
@@ -219,7 +196,7 @@ module "mig" {
   }
 
   autoscaling_enabled = true
-  autoscaler_name     = ""
+  autoscaler_name     = "mig-autoscaler"
   min_replicas        = var.mig_autoscaling_min_replicas
   max_replicas        = var.mig_autoscaling_max_replicas
 
@@ -270,30 +247,27 @@ module "lb" {
 # --------------------------------------------------------------------------
 # Private DNS Zone
 # --------------------------------------------------------------------------
-resource "google_dns_managed_zone" "private_zone" {
-  project     = var.project_id
-  name        = var.dns_zone_name
-  dns_name    = "${var.dns_name}."
-  description = var.dns_zone_description
-  visibility  = "private"
-  private_visibility_config {
-    networks {
-      network_url = module.consumer_vpc.self_link
-    }
-    networks {
-      network_url = module.producer_vpc.self_link
-    }
-  }
-}
+module "dns" {
+  source         = "./modules/cloud-dns"
+  name           = var.dns_zone_name
+  domain         = "${var.dns_name}."
+  project_id     = var.project_id
+  type           = "peering"
+  target_network = ""
 
-resource "google_dns_record_set" "record" {
-  project      = var.project_id
-  name         = "${var.dns_record_prefix}.${google_dns_managed_zone.private_zone.dns_name}"
-  type         = var.dns_record_type
-  ttl          = var.ttl
-  managed_zone = google_dns_managed_zone.private_zone.name
-  rrdatas      = [module.lb.lb_ip_address]
-  depends_on   = [module.lb]
+  private_visibility_config_networks = [
+    module.consumer_vpc.self_link,
+    module.producer_vpc.self_link
+  ]
+
+  recordsets = [
+    {
+      name    = "${var.dns_record_prefix}.${var.dns_name}"
+      type    = var.dns_record_type
+      ttl     = var.ttl
+      records = [module.lb.lb_ip_address]
+    }
+  ]
 }
 
 # --------------------------------------------------------------------------
