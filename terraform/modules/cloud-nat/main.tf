@@ -8,7 +8,8 @@ locals {
   # intermediate locals
   default_name = "cloud-nat-${random_string.name_suffix.result}"
   # locals for google_compute_router_nat
-  nat_ip_allocate_option = length(var.nat_ips) > 0 ? "MANUAL_ONLY" : "AUTO_ONLY"
+  nat_ip_allocate_option = var.type == "PRIVATE" ? null : coalesce(var.nat_ip_allocate_option, "AUTO_ONLY")
+
   name                   = var.name != "" ? var.name : local.default_name
   router                 = var.create_router ? google_compute_router.router[0].name : var.router
 }

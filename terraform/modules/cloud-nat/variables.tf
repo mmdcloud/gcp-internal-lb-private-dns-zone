@@ -38,6 +38,12 @@ variable "type" {
   default     = "PRIVATE"
 }
 
+variable "nat_ip_allocate_option" {
+  type        = string
+  description = "NAT IP allocate option"
+  default     = "AUTO_ONLY"
+}
+
 variable "nat_ips" {
   type        = list(string)
   description = "List of self_links of external IPs. Changing this forces a new NAT to be created. Value of `nat_ip_allocate_option` is inferred based on nat_ips. If present set to MANUAL_ONLY, otherwise AUTO_ONLY."
