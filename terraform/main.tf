@@ -290,7 +290,7 @@ module "consumer_instance" {
     type        = var.consumer_instance_boot_disk_type
     labels      = var.consumer_labels
   }
-
+  
   network_interfaces = [
     {
       network        = module.consumer_vpc.self_link
