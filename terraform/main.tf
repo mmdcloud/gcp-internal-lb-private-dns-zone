@@ -168,7 +168,7 @@ module "instance_template" {
   create_service_account = true
   service_account_roles  = var.service_account_roles
 
-  startup_script = var.startup_script
+  startup_script = templatefile("${path.module}/scripts/user_data.sh", {})
 
   labels = var.common_labels
 }
@@ -290,7 +290,7 @@ module "consumer_instance" {
     type        = var.consumer_instance_boot_disk_type
     labels      = var.consumer_labels
   }
-  
+
   network_interfaces = [
     {
       network        = module.consumer_vpc.self_link
