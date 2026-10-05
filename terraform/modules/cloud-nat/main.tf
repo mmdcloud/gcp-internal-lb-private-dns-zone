@@ -5,13 +5,14 @@ resource "random_string" "name_suffix" {
 }
 
 locals {
-  # intermediate locals
   default_name = "cloud-nat-${random_string.name_suffix.result}"
-  # locals for google_compute_router_nat
-  nat_ip_allocate_option = var.type == "PRIVATE" ? null : coalesce(var.nat_ip_allocate_option, "AUTO_ONLY")
+  name         = var.name != "" ? var.name : local.default_name
 
-  name                   = var.name != "" ? var.name : local.default_name
-  router                 = var.create_router ? google_compute_router.router[0].name : var.router
+  nat_ip_allocate_option = var.type == "PRIVATE" ? null : (
+    length(var.nat_ips) > 0 ? "MANUAL_ONLY" : coalesce(var.nat_ip_allocate_option, "AUTO_ONLY")
+  )
+
+  router = var.create_router ? google_compute_router.router[0].name : var.router
 }
 
 resource "google_compute_router" "router" {
@@ -22,13 +23,10 @@ resource "google_compute_router" "router" {
   network = var.network
 
   dynamic "bgp" {
-    for_each = var.router_asn != null ? [{
+    for_each = var.router_asn != null ? [1] : []
+    content {
       asn                = var.router_asn
       keepalive_interval = var.router_keepalive_interval
-    }] : []
-    content {
-      asn                = bgp.value.asn
-      keepalive_interval = bgp.value.keepalive_interval
     }
   }
 }
@@ -86,6 +84,22 @@ resource "google_compute_router_nat" "main" {
         source_nat_active_ranges = rules.value.action.source_nat_active_ranges
         source_nat_drain_ranges  = rules.value.action.source_nat_drain_ranges
       }
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition = (
+        var.source_subnetwork_ip_ranges_to_nat == "LIST_OF_SUBNETWORKS"
+        ? length(var.subnetworks) > 0
+        : length(var.subnetworks) == 0
+      )
+      error_message = "When source_subnetwork_ip_ranges_to_nat is 'LIST_OF_SUBNETWORKS', the subnetworks list must not be empty. For all other options, subnetworks must be empty."
+    }
+
+    precondition {
+      condition     = !var.create_router || var.network != ""
+      error_message = "The network variable must be specified when create_router is true."
     }
   }
 }

@@ -1,163 +1,170 @@
 variable "project_id" {
   type        = string
-  description = "The project ID to deploy to"
+  description = "The project ID to deploy to."
 }
 
 variable "region" {
   type        = string
-  description = "The region to deploy to"
-}
-
-variable "icmp_idle_timeout_sec" {
-  type        = string
-  description = "Timeout (in seconds) for ICMP connections. Defaults to 30s if not set. Changing this forces a new NAT to be created."
-  default     = "30"
-}
-
-variable "min_ports_per_vm" {
-  type        = string
-  description = "Minimum number of ports allocated to a VM from this NAT config. Defaults to 64 if enable_dynamic_port_allocation is false, 32 if true. Changing this forces a new NAT to be created."
-  default     = null
-}
-
-variable "max_ports_per_vm" {
-  type        = string
-  description = "Maximum number of ports allocated to a VM from this NAT. This field can only be set when enableDynamicPortAllocation is enabled.This will be ignored if enable_dynamic_port_allocation is set to false."
-  default     = null
-}
-
-variable "name" {
-  type        = string
-  description = "Defaults to 'cloud-nat-RANDOM_SUFFIX'. Changing this forces a new NAT to be created."
-  default     = ""
+  description = "The region to deploy to."
 }
 
 variable "type" {
   type        = string
-  description = "Defaults to 'cloud-nat-RANDOM_SUFFIX'. Changing this forces a new NAT to be created."
-  default     = "PRIVATE"
+  description = "NAT type: PUBLIC or PRIVATE."
+  default     = "PUBLIC"
+  validation {
+    condition     = contains(["PUBLIC", "PRIVATE"], var.type)
+    error_message = "Type must be either PUBLIC or PRIVATE."
+  }
 }
 
 variable "nat_ip_allocate_option" {
   type        = string
-  description = "NAT IP allocate option"
-  default     = "AUTO_ONLY"
+  description = "Value can be AUTO_ONLY or MANUAL_ONLY."
+  default     = null
+  validation {
+    condition     = var.nat_ip_allocate_option == null ? true : contains(["AUTO_ONLY", "MANUAL_ONLY"], var.nat_ip_allocate_option)
+    error_message = "nat_ip_allocate_option must be AUTO_ONLY, MANUAL_ONLY, or null."
+  }
 }
 
 variable "nat_ips" {
   type        = list(string)
-  description = "List of self_links of external IPs. Changing this forces a new NAT to be created. Value of `nat_ip_allocate_option` is inferred based on nat_ips. If present set to MANUAL_ONLY, otherwise AUTO_ONLY."
+  description = "List of self_links of external IPs for MANUAL_ONLY allocation."
   default     = []
 }
 
 variable "drain_nat_ips" {
   type        = list(string)
-  description = "A list of URLs of the IP resources to be drained. These IPs must be valid static external IPs that have been assigned to the NAT."
+  description = "URLs of static external IPs assigned to the NAT to be drained."
   default     = []
 }
 
-variable "network" {
+variable "name" {
   type        = string
-  description = "VPN name, only if router is being created by the module."
+  description = "NAT name. Defaults to 'cloud-nat-RANDOM_SUFFIX'."
   default     = ""
 }
 
 variable "create_router" {
   type        = bool
-  description = "Create router instead of using an existing one, uses 'router' variable for new resource name."
+  description = "Create router instead of using an existing one."
   default     = false
 }
 
 variable "router" {
   type        = string
-  description = "The name of the router in which this NAT will be configured. Changing this forces a new NAT to be created."
+  description = "Name of existing router or name for the new router."
+}
+
+variable "network" {
+  type        = string
+  description = "VPC network name; required if create_router is true."
+  default     = ""
 }
 
 variable "router_asn" {
-  type        = string
-  description = "Router ASN, only if create_router is true."
-  default     = "64514"
+  type        = number
+  description = "Router BGP ASN."
+  default     = 64514
 }
 
 variable "router_keepalive_interval" {
-  type        = string
-  description = "Router keepalive_interval, only if router is not passed in and is created by the module."
-  default     = "20"
+  type        = number
+  description = "Router BGP keepalive interval in seconds."
+  default     = 20
 }
 
-variable "source_subnetwork_ip_ranges_to_nat" {
-  type        = string
-  description = "Defaults to ALL_SUBNETWORKS_ALL_IP_RANGES. How NAT should be configured per Subnetwork. Valid values include: ALL_SUBNETWORKS_ALL_IP_RANGES, ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES, LIST_OF_SUBNETWORKS. Changing this forces a new NAT to be created."
-  default     = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+variable "icmp_idle_timeout_sec" {
+  type    = number
+  default = 30
 }
 
 variable "tcp_established_idle_timeout_sec" {
-  type        = string
-  description = "Timeout (in seconds) for TCP established connections. Defaults to 1200s if not set. Changing this forces a new NAT to be created."
-  default     = "1200"
+  type    = number
+  default = 1200
 }
 
 variable "tcp_transitory_idle_timeout_sec" {
-  type        = string
-  description = "Timeout (in seconds) for TCP transitory connections. Defaults to 30s if not set. Changing this forces a new NAT to be created."
-  default     = "30"
+  type    = number
+  default = 30
 }
 
 variable "tcp_time_wait_timeout_sec" {
-  type        = string
-  description = "Timeout (in seconds) for TCP connections that are in TIME_WAIT state. Defaults to 120s if not set."
-  default     = "120"
+  type    = number
+  default = 120
 }
 
 variable "udp_idle_timeout_sec" {
-  type        = string
-  description = "Timeout (in seconds) for UDP connections. Defaults to 30s if not set. Changing this forces a new NAT to be created."
-  default     = "30"
+  type    = number
+  default = 30
+}
+
+variable "min_ports_per_vm" {
+  type        = number
+  description = "Minimum ports per VM. Must be a power of 2 >= 32 if dynamic allocation is on."
+  default     = null
+}
+
+variable "max_ports_per_vm" {
+  type        = number
+  description = "Maximum ports per VM when dynamic port allocation is enabled."
+  default     = null
+}
+
+variable "enable_dynamic_port_allocation" {
+  type    = bool
+  default = false
+}
+
+variable "enable_endpoint_independent_mapping" {
+  type    = bool
+  default = false
+}
+
+variable "source_subnetwork_ip_ranges_to_nat" {
+  type    = string
+  default = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+  validation {
+    condition     = contains(["ALL_SUBNETWORKS_ALL_IP_RANGES", "ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES", "LIST_OF_SUBNETWORKS"], var.source_subnetwork_ip_ranges_to_nat)
+    error_message = "Valid values: ALL_SUBNETWORKS_ALL_IP_RANGES, ALL_SUBNETWORKS_ALL_PRIMARY_IP_RANGES, LIST_OF_SUBNETWORKS."
+  }
 }
 
 variable "subnetworks" {
-  description = "Specifies one or more subnetwork NAT configurations"
+  description = "Subnetwork NAT specifications."
   type = list(object({
-    name                     = string,
+    name                     = string
     source_ip_ranges_to_nat  = list(string)
-    secondary_ip_range_names = list(string)
+    secondary_ip_range_names = optional(list(string), [])
   }))
   default = []
 }
 
 variable "log_config_enable" {
-  type        = bool
-  description = "Indicates whether or not to export logs"
-  default     = false
+  type    = bool
+  default = false
 }
+
 variable "log_config_filter" {
-  type        = string
-  description = "Specifies the desired filtering of logs on this NAT. Valid values are: \"ERRORS_ONLY\", \"TRANSLATIONS_ONLY\", \"ALL\""
-  default     = "ALL"
-}
-
-variable "enable_dynamic_port_allocation" {
-  type        = bool
-  description = "Enable Dynamic Port Allocation. If minPorts is set, minPortsPerVm must be set to a power of two greater than or equal to 32."
-  default     = false
-
-}
-variable "enable_endpoint_independent_mapping" {
-  type        = bool
-  description = "Specifies if endpoint independent mapping is enabled."
-  default     = false
+  type    = string
+  default = "ALL"
+  validation {
+    condition     = contains(["ERRORS_ONLY", "TRANSLATIONS_ONLY", "ALL"], var.log_config_filter)
+    error_message = "Valid values: ERRORS_ONLY, TRANSLATIONS_ONLY, ALL."
+  }
 }
 
 variable "rules" {
-  description = "Specifies one or more rules associated with this NAT."
+  description = "NAT rules configurations."
   type = list(object({
-    description = string
-    match       = string
     rule_number = number
+    description = optional(string)
+    match       = string
     action = object({
-      source_nat_active_ips = optional(list(string))
-      source_nat_drain_ips  = optional(list(string))
-      source_nat_active_ranges  = optional(list(string))
+      source_nat_active_ips    = optional(list(string))
+      source_nat_drain_ips     = optional(list(string))
+      source_nat_active_ranges = optional(list(string))
       source_nat_drain_ranges  = optional(list(string))
     })
   }))

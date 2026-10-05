@@ -252,7 +252,7 @@ module "dns" {
   name           = var.dns_zone_name
   domain         = "${var.dns_name}."
   project_id     = var.project_id
-  type           = "peering"
+  type           = "private"
   target_network = ""
 
   private_visibility_config_networks = [
